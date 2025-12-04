@@ -1,99 +1,59 @@
-// public/script.js
-// Works with your current index.html (onclick="generateKey()").
-// Expects IDs: adminName, duration, outputKey, savedKeys, serverStatus
+const apiBase = "https://raj-keygen.onrender.com";
 
-// helper to format ISO -> local string safely
-function fmt(iso) {
-  try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
-}
-
+// Load saved keys
 async function loadSavedKeys() {
-  const serverStatus = document.getElementById("serverStatus");
-  const savedKeys = document.getElementById("savedKeys");
-  if (!savedKeys) return;
-
-  serverStatus && (serverStatus.textContent = "Loading saved keys...");
-  savedKeys.innerHTML = "";
-
+  const box = document.getElementById("savedKeys");
   try {
-    const res = await fetch("/keys.json", { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const keys = await res.json();
+    const res = await fetch(apiBase + "/keys.json");
+    const data = await res.json();
+    box.innerHTML = "";
 
-    if (!Array.isArray(keys) || keys.length === 0) {
-      savedKeys.innerHTML = "<div class='no-keys'>No saved keys</div>";
-      serverStatus && (serverStatus.textContent = "No saved keys");
+    if (!data.length) {
+      box.innerHTML = "<p>No saved keys found.</p>";
       return;
     }
 
-    // build list (newest first)
-    const fragment = document.createDocumentFragment();
-    keys.forEach(k => {
-      const card = document.createElement("div");
-      card.className = "key-card";
-      const created = fmt(k.createdAt || "");
-      const expires = fmt(k.expiresAt || "");
-      card.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-weight:700">${k.key}</div>
-          <div style="font-size:12px;color:#aaa">${k.admin || ""}</div>
-        </div>
-        <div style="font-size:12px;color:#bbb">Created: ${created} • Expires: ${expires}</div>
+    data.forEach(k => {
+      box.innerHTML += `
+        <div class="keyRow">
+          <p><b>Key:</b> ${k.key}</p>
+          <p><b>Admin:</b> ${k.admin}</p>
+          <p><b>Created:</b> ${k.createdAt}</p>
+          <p><b>Expires:</b> ${k.expiresAt}</p>
+          <p><b>Used:</b> ${k.used}</p>
+        </div><hr>
       `;
-      fragment.appendChild(card);
     });
-
-    savedKeys.appendChild(fragment);
-    serverStatus && (serverStatus.textContent = `Loaded ${keys.length} keys`);
   } catch (err) {
-    savedKeys.innerHTML = `<div class="error">Could not load keys: ${err.message}</div>`;
-    serverStatus && (serverStatus.textContent = "Server unreachable");
-    console.error("loadSavedKeys error:", err);
+    box.innerHTML = "❌ Failed to load keys.";
   }
 }
 
-// Called by your button: onclick="generateKey()"
+// Generate new key
 async function generateKey() {
-  const adminInput = document.getElementById("adminName");
-  const durationSelect = document.getElementById("duration");
-  const output = document.getElementById("outputKey");
-  const serverStatus = document.getElementById("serverStatus");
+  const admin = document.getElementById("adminName").value;
+  const days = document.getElementById("duration").value;
 
-  const admin = (adminInput && adminInput.value) ? adminInput.value : "RAJ_X_ADMIN";
-  const days = (durationSelect && durationSelect.value) ? durationSelect.value : "1";
-
-  if (output) {
-    output.textContent = "Generating…";
-    output.style.opacity = "0.8";
-  }
-  serverStatus && (serverStatus.textContent = "Generating key...");
+  const output = document.getElementById("keyBox");
+  output.innerHTML = "Generating...";
 
   try {
-    const q = new URLSearchParams({ admin, days });
-    const res = await fetch(`/generate?${q.toString()}`);
-    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const res = await fetch(
+      `${apiBase}/generate?admin=${admin}&days=${days}`
+    );
+
     const data = await res.json();
+    output.innerHTML = `<b>${data.key}</b>`;
 
-    // show result
-    if (output) {
-      const created = fmt(data.createdAt);
-      const expires = fmt(data.expiresAt);
-      output.innerHTML = `<strong style="font-size:18px">${data.key}</strong>
-        <div style="font-size:12px;color:#cfcfcf">Admin: ${data.admin} • Created: ${created} • Expires: ${expires}</div>`;
-      output.style.opacity = "1";
-    }
-
-    serverStatus && (serverStatus.textContent = "Key generated successfully");
-    // reload saved list
-    await loadSavedKeys();
+    loadSavedKeys();
   } catch (err) {
-    if (output) output.innerHTML = `<span style="color:crimson">Error: ${err.message}</span>`;
-    serverStatus && (serverStatus.textContent = "Failed to generate");
-    console.error("generateKey error:", err);
+    output.innerHTML = "❌ Error generating key.";
   }
 }
 
-// init on load
+// Auto-run when page opens
 document.addEventListener("DOMContentLoaded", () => {
-  loadSavedKeys().catch(e => console.error(e));
+  loadSavedKeys();
+  const btn = document.getElementById("generateBtn");
+  btn.addEventListener("click", generateKey);
 });
