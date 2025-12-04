@@ -1,1 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAJ X PANNEL KEY — VIP Generator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
 
+<div class="container">
+
+    <h1>RAJ X PANNEL KEY — <span>VIP Generator</span></h1>
+    <p class="subtitle">Indian & Global regions, durations, timestamps, admin info.</p>
+
+    <div class="section">
+        <h2>Saved Keys</h2>
+        <p id="serverStatus">Loading saved keys…</p>
+        <div id="savedKeys"></div>
+    </div>
+
+    <hr>
+
+    <div class="section">
+        <h2>Generate New Key</h2>
+
+        <label>Admin Name</label>
+        <input id="adminName" type="text" value="RAJ_X_ADMIN">
+
+        <label>Duration</label>
+        <select id="duration">
+            <option value="1">1 Day</option>
+            <option value="2">2 Days</option>
+            <option value="4">4 Days</option>
+            <option value="10">10 Days</option>
+            <option value="30">30 Days</option>
+            <option value="999">Lifetime VIP</option>
+        </select>
+
+        <button onclick="generateKey()">Generate Key</button>
+
+        <h3>Generated Key:</h3>
+        <p id="outputKey" class="keyBox">None</p>
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
