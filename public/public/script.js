@@ -1,73 +1,99 @@
 // public/script.js
-document.addEventListener("DOMContentLoaded", () => {
-  const adminInput = document.querySelector("#adminName") || document.querySelector("input[name=admin]") || (() => {
-    // create hidden fallback
-    const i = document.createElement("input"); i.id = "adminName"; i.value = "RAJ_X_ADMIN"; document.body.appendChild(i); return i;
-  })();
-  const durationSelect = document.querySelector("#duration") || document.querySelector("select[name=duration]") || (() => {
-    const s = document.createElement("select"); s.id = "duration"; [1,2,4,10,30,365].forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = `${d} Day${d>1?"s":""}`; s.appendChild(o); }); document.body.appendChild(s); return s;
-  })();
-  const generateBtn = document.querySelector("#generateBtn") || document.querySelector("button#generate") || (() => {
-    const b = document.createElement("button"); b.id = "generateBtn"; b.textContent = "Generate Key"; document.body.appendChild(b); return b;
-  })();
-  const generatedBox = document.querySelector("#generatedKey") || (() => { const d = document.createElement("div"); d.id = "generatedKey"; document.body.appendChild(d); return d; })();
-  const savedKeysContainer = document.querySelector("#savedKeys") || (() => { const c = document.createElement("div"); c.id = "savedKeys"; document.body.appendChild(c); return c; })();
+// Works with your current index.html (onclick="generateKey()").
+// Expects IDs: adminName, duration, outputKey, savedKeys, serverStatus
 
-  // Load existing keys and show them
-  async function loadSavedKeys() {
-    savedKeysContainer.innerHTML = "<em>Loading saved keys...</em>";
-    try {
-      const r = await fetch("/keys.json", { cache: "no-store" });
-      const keys = await r.json();
-      if (!Array.isArray(keys) || keys.length === 0) {
-        savedKeysContainer.innerHTML = "<div class='no-keys'>No saved keys</div>";
-        return;
-      }
-      // build table/list
-      const list = document.createElement("div");
-      list.className = "saved-list";
-      keys.forEach(k => {
-        const card = document.createElement("div");
-        card.className = "key-card";
-        const created = new Date(k.createdAt);
-        const expires = new Date(k.expiresAt);
-        card.innerHTML = `
-          <div class="key-row"><strong>${k.key}</strong> <span class="badge">${k.admin || ""}</span></div>
-          <div class="meta">Created: ${created.toLocaleString()} • Expires: ${expires.toLocaleString()}</div>
-        `;
-        list.appendChild(card);
-      });
-      savedKeysContainer.innerHTML = "";
-      savedKeysContainer.appendChild(list);
-    } catch (e) {
-      savedKeysContainer.innerHTML = `<div class='error'>Could not load keys: ${e.message}</div>`;
+// helper to format ISO -> local string safely
+function fmt(iso) {
+  try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+}
+
+async function loadSavedKeys() {
+  const serverStatus = document.getElementById("serverStatus");
+  const savedKeys = document.getElementById("savedKeys");
+  if (!savedKeys) return;
+
+  serverStatus && (serverStatus.textContent = "Loading saved keys...");
+  savedKeys.innerHTML = "";
+
+  try {
+    const res = await fetch("/keys.json", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const keys = await res.json();
+
+    if (!Array.isArray(keys) || keys.length === 0) {
+      savedKeys.innerHTML = "<div class='no-keys'>No saved keys</div>";
+      serverStatus && (serverStatus.textContent = "No saved keys");
+      return;
     }
+
+    // build list (newest first)
+    const fragment = document.createDocumentFragment();
+    keys.forEach(k => {
+      const card = document.createElement("div");
+      card.className = "key-card";
+      const created = fmt(k.createdAt || "");
+      const expires = fmt(k.expiresAt || "");
+      card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-weight:700">${k.key}</div>
+          <div style="font-size:12px;color:#aaa">${k.admin || ""}</div>
+        </div>
+        <div style="font-size:12px;color:#bbb">Created: ${created} • Expires: ${expires}</div>
+      `;
+      fragment.appendChild(card);
+    });
+
+    savedKeys.appendChild(fragment);
+    serverStatus && (serverStatus.textContent = `Loaded ${keys.length} keys`);
+  } catch (err) {
+    savedKeys.innerHTML = `<div class="error">Could not load keys: ${err.message}</div>`;
+    serverStatus && (serverStatus.textContent = "Server unreachable");
+    console.error("loadSavedKeys error:", err);
   }
+}
 
-  // Generate click
-  generateBtn.addEventListener("click", async (e) => {
-    e.preventDefault();
-    generateBtn.disabled = true;
-    const admin = (adminInput.value || "RAJ_X_ADMIN").toString();
-    const days = parseInt(durationSelect.value || "1", 10);
+// Called by your button: onclick="generateKey()"
+async function generateKey() {
+  const adminInput = document.getElementById("adminName");
+  const durationSelect = document.getElementById("duration");
+  const output = document.getElementById("outputKey");
+  const serverStatus = document.getElementById("serverStatus");
 
-    generatedBox.textContent = "Generating…";
-    try {
-      const q = new URLSearchParams({ admin, days });
-      const r = await fetch(`/generate?${q.toString()}`);
-      if (!r.ok) throw new Error(`Server ${r.status}`);
-      const data = await r.json();
-      // show generated key
-      generatedBox.innerHTML = `<div class="gen-success"><strong>${data.key}</strong><div class="small">Admin: ${data.admin} • Created: ${new Date(data.createdAt).toLocaleString()} • Expires: ${new Date(data.expiresAt).toLocaleString()}</div></div>`;
-      // reload saved keys
-      await loadSavedKeys();
-    } catch (err) {
-      generatedBox.innerHTML = `<div class="error">Error: ${err.message}</div>`;
-    } finally {
-      generateBtn.disabled = false;
+  const admin = (adminInput && adminInput.value) ? adminInput.value : "RAJ_X_ADMIN";
+  const days = (durationSelect && durationSelect.value) ? durationSelect.value : "1";
+
+  if (output) {
+    output.textContent = "Generating…";
+    output.style.opacity = "0.8";
+  }
+  serverStatus && (serverStatus.textContent = "Generating key...");
+
+  try {
+    const q = new URLSearchParams({ admin, days });
+    const res = await fetch(`/generate?${q.toString()}`);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+
+    // show result
+    if (output) {
+      const created = fmt(data.createdAt);
+      const expires = fmt(data.expiresAt);
+      output.innerHTML = `<strong style="font-size:18px">${data.key}</strong>
+        <div style="font-size:12px;color:#cfcfcf">Admin: ${data.admin} • Created: ${created} • Expires: ${expires}</div>`;
+      output.style.opacity = "1";
     }
-  });
 
-  // initial load
-  loadSavedKeys();
+    serverStatus && (serverStatus.textContent = "Key generated successfully");
+    // reload saved list
+    await loadSavedKeys();
+  } catch (err) {
+    if (output) output.innerHTML = `<span style="color:crimson">Error: ${err.message}</span>`;
+    serverStatus && (serverStatus.textContent = "Failed to generate");
+    console.error("generateKey error:", err);
+  }
+}
+
+// init on load
+document.addEventListener("DOMContentLoaded", () => {
+  loadSavedKeys().catch(e => console.error(e));
 });
