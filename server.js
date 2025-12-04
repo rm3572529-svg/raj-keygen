@@ -1,22 +1,20 @@
 // server.js
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Ensure keys file exists
 const keysPath = path.join(__dirname, "keys.json");
-const publicDir = path.join(__dirname, "public");
-
-// Create keys.json if missing
 if (!fs.existsSync(keysPath)) {
   fs.writeFileSync(keysPath, "[]", "utf8");
 }
 
-// Load keys
+// Helpers
 function loadKeys() {
   try {
     return JSON.parse(fs.readFileSync(keysPath, "utf8") || "[]");
@@ -24,63 +22,55 @@ function loadKeys() {
     return [];
   }
 }
-
-// Save keys
 function saveKeys(arr) {
   fs.writeFileSync(keysPath, JSON.stringify(arr, null, 2), "utf8");
 }
 
-// Generate key format: RAJ_XXXXX999
-function generateKey() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let s = "";
-  for (let i = 0; i < 8; i++) {
-    s += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return "RAJ_" + s;
-}
-
-// API: Generate a new key (frontend calls this)
+// API: generate a new key (accepts ?admin=NAME&days=N)
 app.get("/generate", (req, res) => {
-  res.json({ key: generateKey() });
+  try {
+    const admin = (req.query.admin || "RAJ_X_ADMIN").toString().trim();
+    const days = parseInt(req.query.days || "1", 10) || 1;
+
+    // create an 8+ char key like RAJ_ABC1...
+    const raw = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const newKey = `RAJ_${raw}`;
+
+    const now = new Date();
+    const expires = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+    const item = {
+      key: newKey,
+      admin: admin,
+      createdAt: now.toISOString(),
+      expiresAt: expires.toISOString(),
+      used: false
+    };
+
+    const keys = loadKeys();
+    keys.unshift(item); // newest first
+    saveKeys(keys);
+
+    return res.json(item);
+  } catch (err) {
+    console.error("Generate error:", err);
+    return res.status(500).json({ error: "Could not generate key" });
+  }
 });
 
-// API: Save key with admin, time, expiry
-app.post("/save", (req, res) => {
-  const { key, admin, days } = req.body;
-
-  if (!key) return res.status(400).json({ error: "Missing key" });
-
-  const now = new Date();
-  const expiry = new Date(now.getTime() + (days * 24 * 60 * 60 * 1000));
-
-  const record = {
-    key,
-    admin: admin || "RAJ_X_ADMIN",
-    created: now.toISOString(),
-    expiry: expiry.toISOString(),
-    used: false
-  };
-
-  const keys = loadKeys();
-  keys.unshift(record);
-  saveKeys(keys);
-
-  res.json({ success: true, saved: record });
-});
-
-// Send saved keys to frontend
+// Return saved keys (already saved as array of objects)
 app.get("/keys.json", (req, res) => {
-  res.json(loadKeys());
+  res.setHeader("Content-Type", "application/json");
+  res.sendFile(keysPath);
 });
 
-// Serve UI from public folder
-app.use(express.static(publicDir));
+// Serve static frontend (public/index.html)
+app.use(express.static(path.join(__dirname, "public")));
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(publicDir, "index.html"));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Start server
+// Start server (use Render PORT or fallback)
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server Live on port", PORT));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
