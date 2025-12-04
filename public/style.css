@@ -1,1 +1,76 @@
+body {
+    background: #0a0f16;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
 
+.container {
+    width: 90%;
+    margin: auto;
+    padding: 20px;
+}
+
+h1 {
+    font-size: 26px;
+    color: #ff7a18;
+}
+
+h1 span {
+    color: #ffb038;
+}
+
+.subtitle {
+    color: #9aa0a6;
+}
+
+.section {
+    background: #111826;
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+}
+
+label {
+    display: block;
+    margin-top: 10px;
+    color: #ddd;
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 6px;
+    border-radius: 8px;
+    border: none;
+    background: #1b2333;
+    color: #fff;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 15px;
+    background: #00c46b;
+    border: none;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 8px;
+    color: #000;
+}
+
+.keyBox {
+    background: #1b2333;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 10px;
+    word-break: break-all;
+}
+
+.saved-item {
+    background: #1f2937;
+    padding: 12px;
+    margin: 5px 0;
+    border-radius: 8px;
+}
